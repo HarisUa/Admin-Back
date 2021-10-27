@@ -9,6 +9,8 @@ import { CreateMybetDto } from './dto/create-mybet.dto';
 import { GetMybetQueryDto } from './dto/get-mybet-query.dto';
 import { UpdateMybetDto } from './dto/update-mybet.dto';
 import { MybetModel } from './models/mybet.model';
+//import { ALL } from 'dns';
+
 
 /**
  * To serve requests from mybets controller
@@ -82,12 +84,12 @@ export class MybetService {
     // based on status define query
     if (queryParams.status === GET_RECORDS_QUERY_STATUSES.ACTIVE) {
       filterQuery.mybetStatus = true;
-      // filterQuery.createdAt = { [Op.or]: [{ [Op.gt]: currentTime }, { [Op.eq]: null }] };
+     //filterQuery.createdAt = { [Op.or]: [{ [Op.gt]: currentTime }, { [Op.eq]: null }] };
     } else if (queryParams.status === GET_RECORDS_QUERY_STATUSES.INACTIVE) {
       filterQuery.mybetStatus = false;
-    } else if (queryParams.status === GET_RECORDS_QUERY_STATUSES.EXPIRED) {
-      // filterQuery.mybetStatus = true;
-      filterQuery.updatedAt = { [Op.lte]: currentTime };
+    } else if (queryParams.status === GET_RECORDS_QUERY_STATUSES.ALL) {
+      //filterQuery.mybetStatus = true;
+      filterQuery.createdAt = { [Op.lte]: currentTime };
     }
     // get messages and total messages count
     const { rows: mybets, count: totalMybets } = await this.mybetModel.findAndCountAll({
@@ -108,16 +110,16 @@ export class MybetService {
     const currentTime = new Date();
 
     // find active, expired and in-active counts
-    const [active, expired, inActive] = await Promise.all([
+    const [active, inActive, all] = await Promise.all([
       this.mybetModel.count({ where: { mybetStatus: true } }),
       this.mybetModel.count({ where: { mybetStatus: true, deletedAt: { [Op.lte]: currentTime } } }),
-      this.mybetModel.count({ where: { mybetStatus: false } }),
+      this.mybetModel.count({ where: { mybetStatus: true } }),
     ]);
 
     return {
       [GET_RECORDS_QUERY_STATUSES.ACTIVE]: active,
-      [GET_RECORDS_QUERY_STATUSES.EXPIRED]: expired,
       [GET_RECORDS_QUERY_STATUSES.INACTIVE]: inActive,
+      [GET_RECORDS_QUERY_STATUSES.ALL]: all,
     };
   }
 
@@ -169,7 +171,7 @@ export class MybetService {
     // if (!updateMybetDto.sendToAll && !updateMybetDto.includedExcludedUsers?.length) {
     //   throw new BadRequestException('If send to all is false then provide users to include');
     // }
-    // to set date from current date when date from is not provided and set message to active from in-active
+    //to set date from current date when date from is not provided and set message to active from in-active
     // if (updateMessageDto.isActive && updateMessageDto.isActive !== message.mybetStatus && !updateMessageDto.dateFrom) {
     //   updateMessageDto.dateFrom = new Date();
     // }

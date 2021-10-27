@@ -109,4 +109,5 @@
    ACTIVE = 'active',
    INACTIVE = 'inactive',
    EXPIRED = 'expired',
+   ALL = 'all'
  }
