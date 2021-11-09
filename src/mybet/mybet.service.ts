@@ -1,16 +1,11 @@
 import { BadRequestException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { Op, Order, WhereOptions } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
-
-import { PromotionModel } from '@src/promotions/model/promotion.model';
 import { GET_RECORDS_QUERY_STATUSES } from '@common';
-
 import { CreateMybetDto } from './dto/create-mybet.dto';
 import { GetMybetQueryDto } from './dto/get-mybet-query.dto';
 import { UpdateMybetDto } from './dto/update-mybet.dto';
 import { MybetModel } from './models/mybet.model';
-//import { ALL } from 'dns';
-
 
 /**
  * To serve requests from mybets controller
@@ -37,37 +32,18 @@ export class MybetService {
    * @param {CreateMybetDto} createMybetDto
    * @param {string} userId
    */
-  async create(createMybetDto: CreateMybetDto, userId: string) {
-    // if active then date till must be required
-    if (createMybetDto.mybetStatus && !createMybetDto.deletedAt) {
-      throw new BadRequestException('Active message must have till date');
-    }
-    // validate send to all functionality
-    // if (!createMybetDto.sendToAll && !createMybetDto.includedExcludedUsers?.length) {
-    //   throw new BadRequestException('If send to all is false then provide users to include');
-    // }
-    // validate promotion is exist or not
-    // if (createMybetDto.promotionId && !(await this.promotionModel.count({ where: { promotionId: createMybetDto.promotionId } }))) {
-    //   throw new BadRequestException('Promotion with given promotion id is not exist');
-    // }
+   async create(createMybetDto: CreateMybetDto, userId: string) {
+    const mybet = this.mybetModel.build();
 
-    const mybetMessage = this.mybetModel.build();
-
-    if (createMybetDto.mybetStatus && !createMybetDto.createdAt) {
-      createMybetDto.createdAt = new Date();
-    }
-
-    mybetMessage.set({
+    mybet.set({
       ...createMybetDto,
-      // createdBy: userId,
-      modifiedBy: userId,
+      updatedBy: userId,
     });
-
-    await mybetMessage.save();
-
-    return mybetMessage.get({ plain: true });
+    await mybet.save();
+    return mybet.get({ plain: true });
   }
 
+    
   /**
    * To get list of messages by pagination
    * @param {GetMybetQueryDto} queryParams
@@ -83,12 +59,10 @@ export class MybetService {
 
     // based on status define query
     if (queryParams.status === GET_RECORDS_QUERY_STATUSES.ACTIVE) {
-      filterQuery.mybetStatus = true;
-     //filterQuery.createdAt = { [Op.or]: [{ [Op.gt]: currentTime }, { [Op.eq]: null }] };
+      filterQuery.isActive = true;
     } else if (queryParams.status === GET_RECORDS_QUERY_STATUSES.INACTIVE) {
-      filterQuery.mybetStatus = false;
+      filterQuery.isActive = false;
     } else if (queryParams.status === GET_RECORDS_QUERY_STATUSES.ALL) {
-      //filterQuery.mybetStatus = true;
       filterQuery.createdAt = { [Op.lte]: currentTime };
     }
     // get messages and total messages count
@@ -109,11 +83,11 @@ export class MybetService {
   async findStatistics() {
     const currentTime = new Date();
 
-    // find active, expired and in-active counts
-    const [active, inActive, all] = await Promise.all([
-      this.mybetModel.count({ where: { mybetStatus: true } }),
-      this.mybetModel.count({ where: { mybetStatus: true, deletedAt: { [Op.lte]: currentTime } } }),
-      this.mybetModel.count({ where: { mybetStatus: true } }),
+    // find active, in-active and all counts
+    const [active, inActive, all ] = await Promise.all([
+      this.mybetModel.count({ where: { isActive: true } }), //deletedAt: { [Op.or]: [{ [Op.gt]: currentTime }, { [Op.eq]: null }] } ,
+      this.mybetModel.count({ where: { isActive: false} }),
+      this.mybetModel.count({ where: { createdAt : { [Op.lte]: currentTime}} }), 
     ]);
 
     return {
@@ -122,20 +96,6 @@ export class MybetService {
       [GET_RECORDS_QUERY_STATUSES.ALL]: all,
     };
   }
-
-  /**
-   * To get dropdown list to use in messages
-   * @returns dropdown list object
-   */
-  // async getMybetDropdown() {
-  //   // get promotions
-  //   const promotions = await this.promotionModel.findAll({ where: { isActive: true }, attributes: ['promotionId', 'promotionName'], raw: true });
-
-  //   // convert promotions to dropdown options
-  //   const promotionsDropdown = promotions.map((promotion) => ({ key: promotion.promotionName, value: promotion.promotionId }));
-
-  //   return { promotions: promotionsDropdown };
-  // }
 
   /**
    * To get one message details
@@ -157,46 +117,25 @@ export class MybetService {
    * @param {string} userId current user id
    * @returns updated mybet details
    */
-  async update(mybetId: string, updateMybetDto: UpdateMybetDto, userId: string) {
-    // fetch message details
-    const mybetMessage = await this.mybetModel.findOne({ where: { mybetId } });
-    if (!mybetMessage) {
-      throw new UnprocessableEntityException('Message not found with given message id');
+   async update(mybetId: string, updateMybetDto: UpdateMybetDto, userId: string) {
+    const mybet = await this.mybetModel.findOne({ where: { mybetId } });
+    if (!mybet) {
+      throw new UnprocessableEntityException('Mybet not found with given regulation id');
     }
-    // if active then date till must be required
-    if (!updateMybetDto.mybetStatus && !updateMybetDto.deletedAt) {
-      throw new BadRequestException('Active message must have till date');
-    }
-    // validate send to all functionality
-    // if (!updateMybetDto.sendToAll && !updateMybetDto.includedExcludedUsers?.length) {
-    //   throw new BadRequestException('If send to all is false then provide users to include');
-    // }
-    //to set date from current date when date from is not provided and set message to active from in-active
-    // if (updateMessageDto.isActive && updateMessageDto.isActive !== message.mybetStatus && !updateMessageDto.dateFrom) {
-    //   updateMessageDto.dateFrom = new Date();
-    // }
-
-    // validate new promotion id if it changed
-    // if (updateMessageDto.promotionId && message.promotionId !== updateMessageDto.promotionId) {
-    //   if (!(await this.promotionModel.count({ where: { promotionId: updateMessageDto.promotionId } }))) {
-    //     throw new BadRequestException('Promotion with given promotion id is not exist');
-    //   }
-    // }
-    mybetMessage.set({ ...updateMybetDto, modifiedBy: userId });
-    await mybetMessage.save();
-    return mybetMessage.get({ plain: true });
+    mybet.set({ ...updateMybetDto });
+    mybet.set('updatedBy', userId);
+    await mybet.save();
+    return mybet.get({ plain: true });
   }
 
   /**
-   * To remove message
-   * @param {string} mybetId id of message
+   * To remove mybet
+   * @param {string} mybetId id of mybet
    */
-  async remove(mybetId: string, userId: string) {
-    const mybetMessage = await this.mybetModel.findByPk(mybetId);
-    if (!mybetMessage) {
-      throw new UnprocessableEntityException('Message not found with given message id');
+   async remove(mybetId: string) {
+    const mybetDeleted = await this.mybetModel.destroy({ where: { mybetId } });
+    if (!mybetDeleted) {
+      throw new UnprocessableEntityException('Regulation not found with given mybet id');
     }
-    mybetMessage.modifiedBy = userId;
-    await mybetMessage.destroy();
   }
 }
